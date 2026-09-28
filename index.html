@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student Performance Predictor</title>
+  <style>
+:root {
+  --paper: #f3f7fb; --grid: #d5e1ee; --ink: #1d2a5b; --pen: #d8362b;
+  --muted: #5b6785; --card: #ffffff; --good: #1f8a55;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --paper: #131a2e; --grid: #22305a; --ink: #e4e9fb; --pen: #ff6a5c; --muted: #9aa6c9; --card: #1a2340; --good: #4cd08a; }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--paper);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+main { max-width: 780px; margin: 0 auto; padding: 40px 18px 50px; }
+h1 { font-family: Georgia, "Times New Roman", serif; font-size: clamp(2rem, 6vw, 3rem); line-height: 1.1; margin: 0 0 12px; }
+h2 { font-family: Georgia, serif; font-size: 1.3rem; margin: 0 0 14px; }
+header p { color: var(--muted); line-height: 1.55; margin: 0 0 26px; max-width: 58ch; }
+.card { background: var(--card); border: 2px solid var(--ink); border-radius: 8px; padding: 24px; margin-bottom: 22px; box-shadow: 5px 5px 0 var(--ink); }
+label { font-weight: 600; display: block; margin-bottom: 10px; }
+.input-row { display: flex; gap: 12px; flex-wrap: wrap; }
+input[type=number] {
+  flex: 1; min-width: 130px; font-size: 1.4rem; padding: 10px 12px; color: var(--ink);
+  background: var(--paper); border: 2px solid var(--ink); border-radius: 6px;
+}
+button {
+  font: inherit; font-weight: 700; cursor: pointer; padding: 10px 24px; border-radius: 6px;
+  color: #fff; background: var(--pen); border: 2px solid var(--ink);
+}
+button:hover { filter: brightness(1.08); }
+button:active { transform: translateY(1px); }
+button.ghost { background: transparent; color: var(--ink); margin-top: 14px; padding: 6px 14px; font-weight: 600; }
+input[type=range] { width: 100%; margin-top: 16px; accent-color: var(--pen); }
+:focus-visible { outline: 3px solid var(--pen); outline-offset: 2px; }
+.error { color: var(--pen); min-height: 1.3em; margin: 8px 0 0; font-size: .95rem; font-weight: 600; }
+.result { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.result[hidden], table[hidden], button[hidden] { display: none; }
+.mark-wrap { padding: 8px; }
+.mark {
+  display: inline-block; font-family: Georgia, serif; font-size: clamp(3.4rem, 12vw, 5rem); font-weight: 700;
+  color: var(--pen); line-height: 1; min-width: 1.9em; text-align: center;
+  border: 4px solid var(--pen); border-radius: 50%; padding: 14px 20px; transform: rotate(-4deg);
+}
+.result-text { flex: 1; min-width: 200px; }
+.out-of { color: var(--muted); margin: 0 0 8px; }
+.bar { height: 12px; border: 2px solid var(--ink); border-radius: 8px; overflow: hidden; background: var(--paper); }
+#bar-fill { height: 100%; width: 0; background: var(--pen); transition: width .5s ease; }
+.grade { font-weight: 700; font-size: 1.15rem; margin: 12px 0 4px; }
+.advice { color: var(--muted); margin: 0; line-height: 1.5; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 22px; }
+.stat { background: var(--card); border: 2px solid var(--ink); border-radius: 8px; padding: 14px 16px; }
+.stat b { display: block; font-family: Georgia, serif; font-size: 1.9rem; }
+.stat span { color: var(--muted); font-size: .9rem; }
+canvas { width: 100%; height: auto; display: block; }
+.equation, .muted, footer { color: var(--muted); font-size: .92rem; }
+.equation { margin: 10px 0 0; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 9px 6px; border-bottom: 1px solid var(--grid); }
+th { font-size: .9rem; color: var(--muted); }
+footer { text-align: center; margin-top: 10px; }
+@media (max-width: 480px) { .card { padding: 16px; box-shadow: 3px 3px 0 var(--ink); } button { width: 100%; } }
+
+</style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Student Performance Predictor</h1>
+      <p>Type how many hours you study per day and press <b>Predict marks</b>. The model learned from 30 students.</p>
+    </header>
+
+    <section class="card predict">
+      <label for="hours">Study hours per day</label>
+      <div class="input-row">
+        <input id="hours" type="number" min="0" max="24" step="0.5" placeholder="e.g. 5" inputmode="decimal">
+        <button id="btn" type="button">Predict marks</button>
+      </div>
+      <input id="slider" type="range" min="0" max="12" step="0.5" value="0" aria-label="Study hours slider">
+      <p id="error" class="error" role="alert"></p>
+
+      <div id="result" class="result" hidden>
+        <div class="mark-wrap"><span class="mark" id="mark">0</span></div>
+        <div class="result-text">
+          <p class="out-of">predicted marks out of 100</p>
+          <div class="bar"><div id="bar-fill"></div></div>
+          <p id="grade" class="grade"></p>
+          <p id="advice" class="advice"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats">
+      <div class="stat"><b id="s-slope">-</b><span>marks gained per extra hour</span></div>
+      <div class="stat"><b id="s-r2">-</b><span>model accuracy (R²)</span></div>
+      <div class="stat"><b id="s-n">-</b><span>students in training data</span></div>
+    </section>
+
+    <section class="card">
+      <h2>Hours vs marks</h2>
+      <canvas id="chart" width="720" height="420" aria-label="Scatter chart of study hours versus marks with best-fit line"></canvas>
+      <p id="equation" class="equation"></p>
+    </section>
+
+    <section class="card">
+      <h2>Your predictions</h2>
+      <p id="empty" class="muted">Nothing yet. Enter your study hours above.</p>
+      <table id="history" hidden>
+        <thead><tr><th>Hours per day</th><th>Predicted marks</th><th>Grade</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <button id="clear" type="button" class="ghost" hidden>Clear list</button>
+    </section>
+
+    <footer>Linear regression, calculated in your browser. Sample data is illustrative.</footer>
+  </main>
+
+  <script>
+// Training data: [study hours per day, marks out of 100]
+// Stored in JS (not CSV) so the page works when opened directly from a folder.
+const DATA = [
+  [0.5, 34], [1, 38], [1, 42], [1.5, 41], [2, 47], [2, 45],
+  [2.5, 52], [3, 55], [3, 51], [3.5, 58], [4, 62], [4, 59],
+  [4.5, 66], [5, 65], [5, 70], [5.5, 69], [6, 74], [6, 72],
+  [6.5, 77], [7, 79], [7, 76], [7.5, 82], [8, 84], [8, 80],
+  [8.5, 86], [9, 88], [9, 91], [9.5, 90], [10, 94], [10, 92]
+];
+
+</script>
+  <script>
+// ---- Linear regression: marks = slope * hours + intercept ----
+function trainModel(data) {
+  const n = data.length;
+  const mx = data.reduce((s, d) => s + d[0], 0) / n;
+  const my = data.reduce((s, d) => s + d[1], 0) / n;
+  let num = 0, den = 0, ssTot = 0;
+  for (const [x, y] of data) { num += (x - mx) * (y - my); den += (x - mx) ** 2; ssTot += (y - my) ** 2; }
+  const slope = num / den, intercept = my - slope * mx;
+  let ssRes = 0;
+  for (const [x, y] of data) ssRes += (y - (slope * x + intercept)) ** 2;
+  return { slope, intercept, r2: 1 - ssRes / ssTot };
+}
+const model = trainModel(DATA);
+const predict = h => Math.max(0, Math.min(100, model.slope * h + model.intercept));
+
+function gradeFor(m) {
+  if (m >= 85) return ["Grade A: excellent", "Great routine. Keep revising and practise past papers."];
+  if (m >= 70) return ["Grade B: good", "Solid result. An extra hour a day could push you into the A range."];
+  if (m >= 55) return ["Grade C: average", "You can improve. Try 1 to 2 more focused hours each day."];
+  if (m >= 40) return ["Grade D: pass, but risky", "Increase study time and focus on your weak topics."];
+  return ["Below pass mark", "Study more each day and ask your teacher for help."];
+}
+
+const $ = id => document.getElementById(id);
+const hoursInput = $("hours"), slider = $("slider"), errorEl = $("error");
+const canvas = $("chart"), ctx = canvas.getContext("2d");
+const predictions = [];
+let current = NaN;
+
+$("s-slope").textContent = "+" + model.slope.toFixed(1);
+$("s-r2").textContent = model.r2.toFixed(2);
+$("s-n").textContent = DATA.length;
+$("equation").textContent = `Best-fit line: marks = ${model.slope.toFixed(2)} × hours + ${model.intercept.toFixed(1)}`;
+
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function drawChart() {
+  const W = canvas.width, H = canvas.height, pad = { l: 56, r: 20, t: 20, b: 46 }, maxX = 12;
+  const px = x => pad.l + (x / maxX) * (W - pad.l - pad.r);
+  const py = y => H - pad.b - (y / 100) * (H - pad.t - pad.b);
+  const ink = css("--ink"), pen = css("--pen"), grid = css("--grid"), muted = css("--muted");
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = "14px system-ui, sans-serif"; ctx.fillStyle = muted; ctx.strokeStyle = grid; ctx.lineWidth = 1;
+  for (let y = 0; y <= 100; y += 20) {
+    ctx.beginPath(); ctx.moveTo(pad.l, py(y)); ctx.lineTo(W - pad.r, py(y)); ctx.stroke();
+    ctx.textAlign = "right"; ctx.fillText(y, pad.l - 8, py(y) + 5);
+  }
+  ctx.textAlign = "center";
+  for (let x = 0; x <= maxX; x += 2) ctx.fillText(x, px(x), H - pad.b + 20);
+  ctx.fillText("Study hours per day", (W + pad.l) / 2, H - 8);
+  ctx.save(); ctx.translate(14, H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("Marks", 0, 0); ctx.restore();
+  ctx.fillStyle = ink;
+  for (const [x, y] of DATA) { ctx.beginPath(); ctx.arc(px(x), py(y), 4.5, 0, Math.PI * 2); ctx.fill(); }
+  ctx.strokeStyle = pen; ctx.lineWidth = 2.5; ctx.beginPath();
+  ctx.moveTo(px(0), py(predict(0))); ctx.lineTo(px(maxX), py(predict(maxX))); ctx.stroke();
+  if (!isNaN(current)) {
+    const m = predict(current);
+    ctx.setLineDash([5, 5]); ctx.strokeStyle = pen; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(px(current), H - pad.b); ctx.lineTo(px(current), py(m)); ctx.lineTo(pad.l, py(m)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = pen; ctx.beginPath(); ctx.arc(px(current), py(m), 9, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = css("--card"); ctx.lineWidth = 3; ctx.stroke();
+  }
+}
+
+function showResult(h, save) {
+  const m = predict(h), [grade, advice] = gradeFor(m);
+  current = h;
+  $("result").hidden = false;
+  $("mark").textContent = Math.round(m);
+  $("bar-fill").style.width = m + "%";
+  $("grade").textContent = grade;
+  $("advice").textContent = h > 10 ? advice + " Note: this is beyond the 0-10 hour training data, so treat it as a rough estimate." : advice;
+  drawChart();
+  if (save) {
+    predictions.unshift({ h, m: Math.round(m), grade: grade.split(":")[0] });
+    if (predictions.length > 8) predictions.pop();
+    renderHistory();
+  }
+}
+
+function renderHistory() {
+  const body = document.querySelector("#history tbody");
+  body.innerHTML = "";
+  for (const r of predictions) {
+    const tr = document.createElement("tr");
+    [r.h + " h", r.m + " / 100", r.grade].forEach(t => { const td = document.createElement("td"); td.textContent = t; tr.appendChild(td); });
+    body.appendChild(tr);
+  }
+  const has = predictions.length > 0;
+  $("history").hidden = !has; $("clear").hidden = !has; $("empty").hidden = has;
+}
+
+function validate(showEmptyError) {
+  const raw = hoursInput.value.trim().replace(",", "."), h = parseFloat(raw);
+  if (raw === "" || isNaN(h)) {
+    errorEl.textContent = showEmptyError ? "Please enter your study hours per day." : "";
+    return NaN;
+  }
+  if (h < 0 || h > 24) { errorEl.textContent = "Enter a value between 0 and 24 hours."; return NaN; }
+  errorEl.textContent = ""; return h;
+}
+
+$("btn").addEventListener("click", () => { const h = validate(true); if (!isNaN(h)) { slider.value = h; showResult(h, true); } });
+hoursInput.addEventListener("keydown", e => { if (e.key === "Enter") $("btn").click(); });
+hoursInput.addEventListener("input", () => { const h = validate(false); if (isNaN(h)) { $("result").hidden = true; current = NaN; drawChart(); return; } slider.value = h; showResult(h, false); });
+slider.addEventListener("input", () => { hoursInput.value = slider.value; errorEl.textContent = ""; showResult(parseFloat(slider.value), false); });
+slider.addEventListener("change", () => showResult(parseFloat(slider.value), true));
+$("clear").addEventListener("click", () => { predictions.length = 0; renderHistory(); });
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawChart);
+
+drawChart();
+
+</script>
+</body>
+</html>
